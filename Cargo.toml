@@ -1,9 +1,22 @@
 [package]
-name = "cn_poems_api"
-version = "0.1.0"
 authors = ["sansx <xiathxth@gmail.com>"]
 edition = "2018"
+name = "cn_poems_api"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
+# actix-web = "3.3.2"
+# actix-rt = "2.1.0"
+actix = "0.11.0-beta.2"
+actix-rt = "2.1.0"
+actix-web = "4.0.0-beta.3"
+listenfd = "0.3"
+
+diesel = {version = "1.4.2", features = ["postgres", "r2d2"]}
+dotenv = "0.15.0"
+r2d2 = "0.8.8"
+derive_more = "0.99.2"
