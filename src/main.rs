@@ -19,6 +19,7 @@ mod handlers;
 mod errors;
 pub mod models;
 pub mod schema;
+mod pagination;
 
 use models::{NewPoem, Poems, ResPoems};
 use schema::poems;

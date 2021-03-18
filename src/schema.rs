@@ -1,4 +1,14 @@
 table! {
+    authors (id) {
+        id -> Int4,
+        name -> Nullable<Varchar>,
+        headimageurl -> Nullable<Varchar>,
+        simpleintro -> Nullable<Text>,
+        detailintro -> Nullable<Json>,
+    }
+}
+
+table! {
     poems (id) {
         id -> Int4,
         _id -> Nullable<Varchar>,
@@ -12,3 +22,17 @@ table! {
         shangxi -> Nullable<Text>,
     }
 }
+
+table! {
+    sentence (id) {
+        id -> Int4,
+        name -> Nullable<Varchar>,
+        from -> Nullable<Text>,
+    }
+}
+
+allow_tables_to_appear_in_same_query!(
+    authors,
+    poems,
+    sentence,
+);
