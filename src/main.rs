@@ -52,7 +52,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .data(pool.clone())
-            .route("/poems", web::get().to(handlers::get_poems))
+            .route("/guwen", web::get().to(handlers::get_poems))
             .route("/users/{id}", web::get().to(handlers::get_poem_by_id))
             // .route("/users", web::post().to(handlers::add_user))
     })
