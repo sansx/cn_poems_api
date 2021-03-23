@@ -1,9 +1,9 @@
 // https://github.com/diesel-rs/diesel/blob/v1.3.0/examples/postgres/advanced-blog-cli/src/pagination.rs
-use diesel::prelude::*;
-use diesel::query_dsl::methods::LoadQuery;
-use diesel::query_builder::*;
 use diesel::pg::Pg;
+use diesel::query_builder::*;
+use diesel::query_dsl::methods::LoadQuery;
 use diesel::sql_types::BigInt;
+use diesel::{prelude::*, query_dsl::methods::OffsetDsl};
 
 pub trait Paginate: Sized {
     fn paginate(self, page: i64) -> Paginated<Self>;
@@ -21,7 +21,7 @@ impl<T> Paginate for T {
 
 const DEFAULT_PER_PAGE: i64 = 10;
 
-#[derive(Debug, Clone, Copy, QueryId)]
+#[derive(Debug, Clone, Copy, Queryable)]
 pub struct Paginated<T> {
     query: T,
     page: i64,
@@ -49,6 +49,17 @@ impl<T> Paginated<T> {
 impl<T: Query> Query for Paginated<T> {
     type SqlType = (T::SqlType, BigInt);
 }
+
+// impl<T: diesel::query_source::Table> Query for Paginated<T> {
+//   type SqlType = (T::SqlType, BigInt);
+// }
+
+// impl<T: Query> OffsetDsl for Paginated<T> {
+//     type Output = Paginated<T>;
+//     fn offset(self, _: i64) -> <Self as OffsetDsl>::Output {
+//         Paginated 
+//     }
+// }
 
 impl<T> RunQueryDsl<PgConnection> for Paginated<T> {}
 
