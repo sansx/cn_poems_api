@@ -4,7 +4,7 @@ use super::schema::poems::dsl::*;
 use super::Pool;
 use crate::diesel::QueryDsl;
 use actix_web::{web, Error, HttpResponse, Responder};
-use diesel::dsl::{delete, insert_into};
+use diesel::{associations::HasTable, dsl::{Offset, delete, insert_into}, pg::{Pg, types::sql_types}, query_builder::{AsQuery, Query, SqlQuery}, query_dsl::load_dsl};
 use diesel::pg::PgConnection;
 use diesel::query_dsl::filter_dsl::{FilterDsl, FindDsl};
 use diesel::query_dsl::{LoadQuery, RunQueryDsl};
@@ -36,22 +36,25 @@ pub async fn get_poems(
 ) -> Result<HttpResponse, Error> {
     println!("{:?}", pagination);
     Ok(
-        web::block(move || get_all_poems::<poems, ResPoems>(db, poems, pagination.page))
+        web::block(move || get_pagination_res::<poems, ResPoems>(db, poems, pagination.page))
             .await
             .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
             .map_err(|_| HttpResponse::InternalServerError())?,
     )
 }
 
-fn get_all_poems<Table, T>(
+fn get_all_poems<T, Table>(
     pool: web::Data<Pool>,
-    table: Table,
+    table:Table,
     page: i64,
 ) -> Result<HttpRes<T>, diesel::result::Error>
-// where
+where
+Paginated<Table>:  LoadQuery<PgConnection, (T, i64)>  ,
+Table: OffsetDsl,
+Offset<Table>:  LoadQuery<PgConnection, (T, i64)>,
+T:diesel::deserialize::Queryable
 //     Table: diesel::associations::HasTable,
 //     <Table as diesel::QuerySource>::FromClause: diesel::query_builder::QueryFragment<diesel::pg::Pg>,
-//     T: QueryDsl,
     // Table<T>: Queryable
 {
     // let mut scores = HashMap::new();
@@ -65,7 +68,7 @@ fn get_all_poems<Table, T>(
     //     .paginate(safepage)
     //     .load_and_count_pages::<(i32, T)>(&conn)?;
     // load::<ResPoems>(&conn)?;
-    let (list, total) = table.paginate(safepage).load_and_count_pages::<T>(&conn)?;
+    let (list, total) =table.offset(0).paginate(safepage).load_and_count_pages::<T>(&conn)?;
     // let results = table.load::<(T, i64)>(&conn)?;
     // let total = results.get(0).map(|x| x.1).unwrap_or(0);
     // let records = results.into_iter().map(|x| x.0).collect();
@@ -87,13 +90,16 @@ struct HttpRes<T> {
     page: i64,
 }
 
-fn get_pagination_res<Table, T, U>(
+fn get_pagination_res<Table, T>(
     pool: web::Data<Pool>,
-    table: Table,
+    table:Table,
     page: i64,
 ) -> Result<HttpRes<T>, diesel::result::Error>
 where
-    Table: diesel::associations::HasTable
+    Table:  LoadQuery<PgConnection, T>,
+    Paginated<Table>:  LoadQuery<PgConnection, (T, i64)>  + RunQueryDsl<PgConnection> ,
+    //  load_dsl::LoadQuery<PgConnection, (T, i64)> + diesel::associations::HasTable + RunQueryDsl<PgConnection> ,
+    // T:  load_dsl::LoadQuery<PgConnection, T>
 {
     let conn = pool.get().unwrap();
     let (list, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;

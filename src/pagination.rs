@@ -21,7 +21,7 @@ impl<T> Paginate for T {
 
 const DEFAULT_PER_PAGE: i64 = 10;
 
-#[derive(Debug, Clone, Copy, Queryable)]
+#[derive(Debug, Clone, Copy, Queryable, QueryId)]
 pub struct Paginated<T> {
     query: T,
     page: i64,
@@ -46,9 +46,14 @@ impl<T> Paginated<T> {
     }
 }
 
+
+
+
+
 impl<T: Query> Query for Paginated<T> {
     type SqlType = (T::SqlType, BigInt);
 }
+
 
 // impl<T: diesel::query_source::Table> Query for Paginated<T> {
 //   type SqlType = (T::SqlType, BigInt);
