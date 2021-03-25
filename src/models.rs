@@ -18,7 +18,7 @@ pub struct Poems {
     pub shangxi: Option<String>,
 }
 
-#[derive(Debug, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Queryable, Serialize, Deserialize)] // , AsExpression
 pub struct ResPoems {
     pub id: i32,
     pub _id: Option<String>,
