@@ -89,6 +89,7 @@ pub struct Author {
 #[allow(non_snake_case)]
 #[derive(Debug, Queryable, Serialize, Deserialize)]
 pub struct ResAuthor {
+    pub id: i32,
     pub name: Option<String>,
     pub headImageUrl: Option<String>,
     pub simpleIntro: Option<String>,
@@ -108,6 +109,7 @@ pub struct NewAuthor {
 impl From<ResAuthor> for NewAuthor {
     fn from(author: ResAuthor) -> Self {
         let ResAuthor {
+            id,
             name,
             headImageUrl,
             simpleIntro,
@@ -117,7 +119,7 @@ impl From<ResAuthor> for NewAuthor {
             name,
             headimageurl: headImageUrl,
             simpleintro: simpleIntro,
-            detailintro: detailIntro,
+            detailintro: None,
         }
     }
 }

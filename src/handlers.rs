@@ -1,43 +1,26 @@
 use super::models::*;
 use super::pagination::*;
-use super::schema::{poems, authors};
+use super::schema::{authors, poems};
 use super::Pool;
-use crate::diesel::QueryDsl;
 use actix_web::{web, Error, HttpResponse, Responder};
-use diesel::query_dsl::{LoadQuery, RunQueryDsl};
-use diesel::query_source::{QuerySource, Queryable, Table};
 use diesel::{
-    associations::HasTable,
-    dsl::{delete, insert_into, Offset},
-    pg::{types::sql_types, Pg},
-    query_builder::{AsQuery, Query, SqlQuery},
-    query_dsl::load_dsl,
-    types::ToSql,
-};
-use diesel::{dsl::Find, query_dsl::methods::OffsetDsl};
-use diesel::{
-    expression::sql_literal,
-    pg,
-    query_builder::QueryFragment,
-    query_dsl::{
-        self,
-        filter_dsl::{FilterDsl, FindDsl},
-    },
-    types::HasSqlType,
+    dsl::Find,
+    query_dsl::{methods::FindDsl, LoadQuery, RunQueryDsl},
+    QueryDsl,
 };
 use diesel::{
-    pg::PgConnection,
-    query_source::{self, AppearsInFromClause},
+    pg::{Pg, PgConnection},
+    query_builder::{AsQuery, QueryFragment},
 };
 use serde::{Deserialize, Serialize};
 use std::vec::Vec;
 
-// #[derive(Deserialize, Serialize)]
-// struct HttpRes<T> {
-//     list: Vec<T>,
-//     total: i64,
-//     page: i64,
-// }
+#[derive(Deserialize, Serialize)]
+struct HttpRes<T> {
+    list: Vec<T>,
+    total: i64,
+    page: i64,
+}
 
 #[derive(Deserialize)]
 pub struct ProductSearch {
@@ -51,16 +34,20 @@ pub struct ProductPagination {
 
 pub async fn get_poems(
     db: web::Data<Pool>,
-    pagination: web::Query<ProductPagination>,
+    pagination: Option<web::Query<ProductPagination>>,
 ) -> Result<HttpResponse, Error> {
     println!("{:?}", pagination);
+    let page = match pagination {
+        None => 1,
+        Some(i) => i.page,
+    };
     // poems::
-    Ok(
-        web::block(move || get_pagination_res::<authors::dsl::authors, ResAuthor>(db, authors::dsl::authors, pagination.page))
-            .await
-            .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
-            .map_err(|_| HttpResponse::InternalServerError())?,
-    )
+    Ok(web::block(move || {
+        get_pagination_res::<authors::dsl::authors, ResAuthor>(db, authors::dsl::authors, page)
+    })
+    .await
+    .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
+    .map_err(|_| HttpResponse::InternalServerError())?)
 }
 
 // fn easy_get(pool: web::Data<Pool>,page: i64,) -> Result<HttpRes<ResPoems>, diesel::result::Error> {
@@ -74,13 +61,6 @@ pub async fn get_poem_by_id() -> impl Responder {
     format!("hello from get users by id")
 }
 
-#[derive(Deserialize, Serialize)]
-struct HttpRes<T> {
-    list: Vec<T>,
-    total: i64,
-    page: i64,
-}
-
 fn get_pagination_res<Table, T>(
     pool: web::Data<Pool>,
     table: Table,
@@ -89,11 +69,18 @@ fn get_pagination_res<Table, T>(
 where
     Paginated<<Table as diesel::query_builder::AsQuery>::Query>:
         LoadQuery<PgConnection, (T, i64)> + RunQueryDsl<PgConnection> + QueryFragment<Pg>,
-    Table: AsQuery + Sized,
+    Table: AsQuery + Sized + FindDsl<i64>,
+    Find<Table, i64>: LoadQuery<PgConnection, Paginated<Table>>,
+    <Table as FindDsl<i64>>::Output: crate::pagination::Paginate,
+    Paginated<<<Table as FindDsl<i64>>::Output as diesel::query_builder::AsQuery>::Query>:
+        LoadQuery<PgConnection, (T, i64)> + RunQueryDsl<PgConnection> + QueryFragment<Pg>,
     //  load_dsl::LoadQuery<PgConnection, (T, i64)> + diesel::associations::HasTable + RunQueryDsl<PgConnection> ,
     // T:  load_dsl::LoadQuery<PgConnection, T>
 {
     let conn = pool.get().unwrap();
-    let (list, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;
+    let (list, total) = table
+        .find(1)
+        .paginate(page)
+        .load_and_count_pages::<T>(&conn)?;
     Ok(HttpRes { list, total, page })
 }

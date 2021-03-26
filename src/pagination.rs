@@ -20,13 +20,14 @@ use diesel::{prelude::*, query_dsl::methods::OffsetDsl};
 // }
 
 pub trait Paginate: AsQuery + Sized {
-  fn paginate(self, page: i64) -> Paginated<Self::Query> {
-      Paginated {
-          query: self.as_query(),
-          page,
-          per_page: DEFAULT_PER_PAGE,
-       }
-  }
+    fn paginate(self, page: i64) -> Paginated<Self::Query> {
+      
+        Paginated {
+            query: self.as_query(),
+            page,
+            per_page: DEFAULT_PER_PAGE,
+        }
+    }
 }
 
 impl<T: AsQuery> Paginate for T {}
