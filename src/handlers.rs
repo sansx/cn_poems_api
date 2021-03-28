@@ -34,9 +34,11 @@ pub struct SearchID {
     pub id: i32,
 }
 
-#[derive(Deserialize)]
-pub struct ProductSearch {
-    pub search: String,
+#[derive(Deserialize, Debug)]
+pub struct PoemsSearch {
+    pub writer: Option<String>,
+    pub dynasty: Option<String>,
+    pub keyword: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -83,6 +85,20 @@ pub async fn get_poem_by_id(
     use super::schema::poems::dsl::{id, poems};
     Ok(
         web::block(move || poems.find(res.id).first::<ResPoems>(&db.get().unwrap()))
+            .await
+            .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
+            .map_err(|_| HttpResponse::InternalServerError())?,
+    )
+}
+
+pub async fn get_poems_by_search(
+    db: web::Data<Pool>,
+    res: Option<web::Query<PoemsSearch>>,
+) -> Result<HttpResponse, Error> {
+    use super::schema::poems::dsl::{id, poems};
+    println!("{:?}", res);
+    Ok(
+        web::block(move || poems.find(2500).first::<ResPoems>(&db.get().unwrap()))
             .await
             .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
             .map_err(|_| HttpResponse::InternalServerError())?,

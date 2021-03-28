@@ -8,6 +8,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{self, ConnectionManager};
 use dotenv::dotenv;
+use handlers::get_poems_by_search;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::error;
@@ -54,6 +55,7 @@ async fn main() -> std::io::Result<()> {
             .data(pool.clone())
             .route("/guwen", web::get().to(handlers::get_poems))
             .route("/guwen/selectbyid", web::get().to(handlers::get_poem_by_id))
+            .route("/guwen/search", web::get().to(handlers::get_poems_by_search))
             // .route("/users", web::post().to(handlers::add_user))
     })
     .bind("127.0.0.1:8080")?
