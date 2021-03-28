@@ -53,7 +53,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .data(pool.clone())
             .route("/guwen", web::get().to(handlers::get_poems))
-            .route("/users/{id}", web::get().to(handlers::get_poem_by_id))
+            .route("/guwen/selectbyid", web::get().to(handlers::get_poem_by_id))
             // .route("/users", web::post().to(handlers::add_user))
     })
     .bind("127.0.0.1:8080")?
