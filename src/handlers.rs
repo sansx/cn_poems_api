@@ -41,6 +41,33 @@ pub struct PoemsSearch {
     pub keyword: Option<String>,
 }
 
+enum SearchRes {
+    WRes(String),
+    DRes(String),
+    KRes(String),
+    NRes,
+}
+
+impl PoemsSearch {
+    fn get_res(self) -> SearchRes {
+        let PoemsSearch {
+            writer,
+            dynasty,
+            keyword,
+        } = self;
+        if writer.is_some() {
+            return SearchRes::WRes(writer.unwrap());
+        }
+        if dynasty.is_some() {
+            return SearchRes::DRes(dynasty.unwrap());
+        }
+        if keyword.is_some() {
+            return SearchRes::KRes(keyword.unwrap());
+        }
+        SearchRes::NRes
+    }
+}
+
 #[derive(Deserialize, Debug)]
 pub struct ProductPagination {
     pub page: i64,
@@ -57,7 +84,7 @@ pub async fn get_poems(
         Some(i) => i.page,
     };
     Ok(
-        web::block(move || get_pagination_res::<poems, ResPoems>(db, poems, page))
+        web::block(move || get_pagination_res_tb::<poems, ResPoems>(db, poems, page))
             .await
             .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
             .map_err(|_| HttpResponse::InternalServerError())?,
@@ -94,15 +121,55 @@ pub async fn get_poem_by_id(
 pub async fn get_poems_by_search(
     db: web::Data<Pool>,
     res: Option<web::Query<PoemsSearch>>,
+    pagination: Option<web::Query<ProductPagination>>,
 ) -> Result<HttpResponse, Error> {
-    use super::schema::poems::dsl::{id, poems};
-    println!("{:?}", res);
+    use super::schema::poems::dsl::*;
+    let page = match pagination {
+        None => 1,
+        Some(i) => i.page,
+    };
     Ok(
-        web::block(move || poems.find(2500).first::<ResPoems>(&db.get().unwrap()))
-            .await
-            .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
-            .map_err(|_| HttpResponse::InternalServerError())?,
+        web::block(move || match res.unwrap().into_inner().get_res() {
+            SearchRes::WRes(x) => poems
+                .filter(writer.eq(x))
+                .paginate(page)
+                .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
+            SearchRes::DRes(x) => poems
+                .filter(dynasty.eq(x))
+                .paginate(page)
+                .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
+            SearchRes::KRes(x) => poems
+                //todo
+                .filter(writer.like(x + "%"))
+                .paginate(page)
+                .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
+            SearchRes::NRes => poems
+                .paginate(page)
+                .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
+        })
+        .await
+        .map(|poem| {
+            let (list, total) = poem.unwrap();
+            HttpResponse::Ok().json(HttpRes { list, total, page })
+        })
+        .map_err(|_| HttpResponse::InternalServerError())?,
     )
+}
+
+fn get_pagination_res_tb<Table, T>(
+    pool: web::Data<Pool>,
+    table: Table,
+    page: i64,
+) -> Result<HttpRes<T>, diesel::result::Error>
+where
+    Paginated<<Table as diesel::query_builder::AsQuery>::Query>:
+        LoadQuery<PgConnection, (T, i64)> + RunQueryDsl<PgConnection> + QueryFragment<Pg>,
+    Table: AsQuery + Sized + TbPaginate,
+    T: Debug,
+{
+    let conn = pool.get().unwrap();
+    let (list, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;
+    Ok(HttpRes { list, total, page })
 }
 
 fn get_pagination_res<Table, T>(
@@ -111,11 +178,10 @@ fn get_pagination_res<Table, T>(
     page: i64,
 ) -> Result<HttpRes<T>, diesel::result::Error>
 where
-    Paginated<<Table as diesel::query_builder::AsQuery>::Query>:
+    Paginated<Table>:
         LoadQuery<PgConnection, (T, i64)> + RunQueryDsl<PgConnection> + QueryFragment<Pg>,
-    Table: AsQuery + Sized,
+    Table: AsQuery + Sized + Paginate,
     T: Debug,
-    <Table as diesel::query_builder::AsQuery>::Query: Clone,
 {
     let conn = pool.get().unwrap();
     let (list, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;

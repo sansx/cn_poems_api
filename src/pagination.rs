@@ -7,9 +7,27 @@ use diesel::sql_types::BigInt;
 use diesel::{associations::HasTable, pg::Pg};
 use diesel::{prelude::*, query_dsl::methods::OffsetDsl};
 
-// pub trait Paginate: Sized {
-//     fn paginate(self, page: i64) -> Paginated<Self>;
-// }
+pub trait Paginate: Sized {
+    fn paginate(self, page: i64) -> Paginated<Self> {
+        Paginated {
+            query: self,
+            per_page: DEFAULT_PER_PAGE,
+            page,
+        }
+    }
+}
+
+pub trait TbPaginate: Sized + AsQuery {
+    fn paginate(self, page: i64) -> Paginated<Self::Query> {
+        Paginated {
+            query: self.as_query(),
+            per_page: DEFAULT_PER_PAGE,
+            page,
+        }
+    }
+}
+
+impl<T: AsQuery> TbPaginate for T {}
 
 // impl<T> Paginate for T {
 //     fn paginate(self, page: i64) -> Paginated<Self> {
@@ -21,18 +39,27 @@ use diesel::{prelude::*, query_dsl::methods::OffsetDsl};
 //     }
 // }
 
-pub trait Paginate: AsQuery + Sized {
-    fn paginate(self, page: i64) -> Paginated<Self::Query> {
-      
-        Paginated {
-            query: self.as_query(),
-            page,
-            per_page: DEFAULT_PER_PAGE,
-        }
-    }
-}
+// pub trait Paginate: AsQuery + Sized {
+//     fn paginate(self, page: i64) -> Paginated<Self::Query> {
 
-impl<T: AsQuery> Paginate for T {}
+//         Paginated {
+//             query: self.as_query(),
+//             page,
+//             per_page: DEFAULT_PER_PAGE,
+//         }
+//     }
+// }
+
+// impl<T: AsQuery> Paginate for T {
+//     // type T = <T as diesel::query_builder::AsQuery>::Query;
+//     fn paginate(self, page: i64) -> Paginated<Self> {
+//         Paginated {
+//             query: self,
+//             page,
+//             per_page: DEFAULT_PER_PAGE,
+//         }
+//     }
+// }
 
 const DEFAULT_PER_PAGE: i64 = 10;
 
@@ -64,8 +91,8 @@ impl<T> Paginated<T> {
 
     pub fn load_and_count_pages<U>(self, conn: &PgConnection) -> QueryResult<(Vec<U>, i64)>
     where
-        Self: LoadQuery<PgConnection, (U, i64)> + Clone,
-        U: Debug
+        Self: LoadQuery<PgConnection, (U, i64)>,
+        U: Debug,
     {
         let per_page = self.per_page;
         let results = self.load::<(U, i64)>(conn)?;

@@ -16,11 +16,11 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::time::Instant;
 
-mod handlers;
 mod errors;
+mod handlers;
 pub mod models;
-pub mod schema;
 mod pagination;
+pub mod schema;
 
 use models::{NewPoem, Poems, ResPoems};
 use schema::poems;
@@ -55,8 +55,19 @@ async fn main() -> std::io::Result<()> {
             .data(pool.clone())
             .route("/guwen", web::get().to(handlers::get_poems))
             .route("/guwen/selectbyid", web::get().to(handlers::get_poem_by_id))
-            .route("/guwen/search", web::get().to(handlers::get_poems_by_search))
-            // .route("/users", web::post().to(handlers::add_user))
+            .route(
+                "/guwen/selectbywriter",
+                web::get().to(handlers::get_poems_by_search),
+            )
+            .route(
+                "/guwen/selectbydynasty",
+                web::get().to(handlers::get_poems_by_search),
+            )
+            .route(
+                "/guwen/selectbykeyword",
+                web::get().to(handlers::get_poems_by_search),
+            )
+        // .route("/users", web::post().to(handlers::add_user))
     })
     .bind("127.0.0.1:8080")?
     .run()
