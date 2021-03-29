@@ -67,6 +67,18 @@ async fn main() -> std::io::Result<()> {
                 "/guwen/selectbykeyword",
                 web::get().to(handlers::get_poems_by_search),
             )
+            .route(
+                "/guwen/writer/selectall",
+                web::get().to(handlers::get_poems_by_search),
+            )
+            .route(
+                "/guwen/writer/selectbyname",
+                web::get().to(handlers::get_writer_by_search),
+            )
+            .route(
+                "/guwen/writer/selectbyid",
+                web::get().to(handlers::get_writer_by_search),
+            )
         // .route("/users", web::post().to(handlers::add_user))
     })
     .bind("127.0.0.1:8080")?

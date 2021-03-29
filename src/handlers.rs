@@ -1,3 +1,4 @@
+use super::errors;
 use super::models::*;
 use super::pagination::*;
 use super::schema::*;
@@ -32,6 +33,13 @@ struct HttpRes<T> {
 #[derive(Deserialize)]
 pub struct SearchID {
     pub id: i32,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct WriterSearch {
+    pub id: Option<i32>,
+    pub name: Option<String>,
+    // pub keyword: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -138,11 +146,18 @@ pub async fn get_poems_by_search(
                 .filter(dynasty.eq(x))
                 .paginate(page)
                 .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
-            SearchRes::KRes(x) => poems
-                //todo
-                .filter(writer.like(x + "%"))
-                .paginate(page)
-                .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
+            SearchRes::KRes(x) => {
+                let re = format!("%{}%", x);
+                poems
+                    .filter(
+                        writer
+                            .like(re.clone())
+                            .or(title.like(re.clone()))
+                            .or(content.like(re.clone())),
+                    )
+                    .paginate(page)
+                    .load_and_count_pages::<ResPoems>(&db.get().unwrap())
+            }
             SearchRes::NRes => poems
                 .paginate(page)
                 .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
@@ -154,6 +169,29 @@ pub async fn get_poems_by_search(
         })
         .map_err(|_| HttpResponse::InternalServerError())?,
     )
+}
+
+pub async fn get_writer_by_search(
+    db: web::Data<Pool>,
+    res: Option<web::Query<WriterSearch>>,
+) -> Result<HttpResponse, Error> {
+    use super::schema::authors::dsl::*;
+    // if res.is_none() {
+    //     return Err(actix_web::error::ErrorNotFound("asd"));
+    // }
+
+    Ok(web::block(move || {
+      let re = res.unwrap().into_inner();
+        if let Some(x) = re.id {
+          return  authors.find(x).first::<ResAuthor>(&db.get().unwrap())
+        }
+        authors
+            .filter(name.eq(re.name))
+            .first::<ResAuthor>(&db.get().unwrap())
+    })
+    .await
+    .map(|writer| HttpResponse::Ok().json(writer.unwrap()))
+    .map_err(|_| HttpResponse::InternalServerError())?)
 }
 
 fn get_pagination_res_tb<Table, T>(
