@@ -23,11 +23,32 @@ use diesel::{
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, vec::Vec};
 
+// #[derive(Deserialize, Serialize)]
+// struct HttpRes<T> {
+//     data: Vec<T>,
+//     total: i64,
+//     page: i64,
+// }
+
 #[derive(Deserialize, Serialize)]
 struct HttpRes<T> {
-    list: Vec<T>,
-    total: i64,
-    page: i64,
+    pub total: i64,
+    pub pages: i64,
+    pub page: i64,
+    pub pagesize: i64,
+    pub data: Vec<T>,
+}
+
+impl<T> HttpRes<T> {
+    fn new(data: Vec<T>, pages: i64, page: i64) -> HttpRes<T> {
+        HttpRes {
+            data,
+            total: 1000,
+            page,
+            pages,
+            pagesize: 10,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -47,12 +68,14 @@ pub struct PoemsSearch {
     pub writer: Option<String>,
     pub dynasty: Option<String>,
     pub keyword: Option<String>,
+    pub sentence: Option<String>,
 }
 
 enum SearchRes {
     WRes(String),
     DRes(String),
     KRes(String),
+    SRes(String),
     NRes,
 }
 
@@ -62,6 +85,7 @@ impl PoemsSearch {
             writer,
             dynasty,
             keyword,
+            sentence,
         } = self;
         if writer.is_some() {
             return SearchRes::WRes(writer.unwrap());
@@ -71,6 +95,9 @@ impl PoemsSearch {
         }
         if keyword.is_some() {
             return SearchRes::KRes(keyword.unwrap());
+        }
+        if sentence.is_some() {
+            return SearchRes::SRes(sentence.unwrap());
         }
         SearchRes::NRes
     }
@@ -99,18 +126,48 @@ pub async fn get_poems(
     )
 }
 
+pub async fn get_writers(
+    db: web::Data<Pool>,
+    pagination: Option<web::Query<ProductPagination>>,
+) -> Result<HttpResponse, Error> {
+    use self::authors::dsl::*;
+    let page = match pagination {
+        None => 1,
+        Some(i) => i.page,
+    };
+    Ok(
+        web::block(move || get_pagination_res_tb::<authors, ResAuthor>(db, authors, page))
+            .await
+            .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
+            .map_err(|_| HttpResponse::InternalServerError())?,
+    )
+}
+
+pub async fn get_sentences(
+    db: web::Data<Pool>,
+    pagination: Option<web::Query<ProductPagination>>,
+) -> Result<HttpResponse, Error> {
+    use self::sentence::dsl::*;
+    let page = match pagination {
+        None => 1,
+        Some(i) => i.page,
+    };
+    Ok(
+        web::block(move || get_pagination_res_tb::<sentence, Sentence>(db, sentence, page))
+            .await
+            .map(|poem| HttpResponse::Ok().json(poem.unwrap()))
+            .map_err(|_| HttpResponse::InternalServerError())?,
+    )
+}
+
 fn easy_get(pool: web::Data<Pool>, page: i64) -> Result<HttpRes<ResPoems>, diesel::result::Error> {
     use self::poems::dsl::*;
     let safepage = if page < 1 { 1 } else { page };
     let conn = pool.get().unwrap();
-    let (list, total) = poems
+    let (data, total) = poems
         .paginate(safepage)
         .load_and_count_pages::<ResPoems>(&conn)?;
-    Ok(HttpRes {
-        list,
-        total,
-        page: 1,
-    })
+    Ok(HttpRes::<ResPoems>::new(data, total, 1))
 }
 
 pub async fn get_poem_by_id(
@@ -158,14 +215,18 @@ pub async fn get_poems_by_search(
                     .paginate(page)
                     .load_and_count_pages::<ResPoems>(&db.get().unwrap())
             }
+            SearchRes::SRes(x) => poems
+                .filter(content.like(format!("%{}%", x)))
+                .paginate(page)
+                .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
             SearchRes::NRes => poems
                 .paginate(page)
                 .load_and_count_pages::<ResPoems>(&db.get().unwrap()),
         })
         .await
         .map(|poem| {
-            let (list, total) = poem.unwrap();
-            HttpResponse::Ok().json(HttpRes { list, total, page })
+            let (data, total) = poem.unwrap();
+            HttpResponse::Ok().json(HttpRes::<ResPoems>::new(data, total, page))
         })
         .map_err(|_| HttpResponse::InternalServerError())?,
     )
@@ -181,9 +242,9 @@ pub async fn get_writer_by_search(
     // }
 
     Ok(web::block(move || {
-      let re = res.unwrap().into_inner();
+        let re = res.unwrap().into_inner();
         if let Some(x) = re.id {
-          return  authors.find(x).first::<ResAuthor>(&db.get().unwrap())
+            return authors.find(x).first::<ResAuthor>(&db.get().unwrap());
         }
         authors
             .filter(name.eq(re.name))
@@ -206,8 +267,8 @@ where
     T: Debug,
 {
     let conn = pool.get().unwrap();
-    let (list, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;
-    Ok(HttpRes { list, total, page })
+    let (data, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;
+    Ok(HttpRes::<T>::new(data, total, page))
 }
 
 fn get_pagination_res<Table, T>(
@@ -222,8 +283,8 @@ where
     T: Debug,
 {
     let conn = pool.get().unwrap();
-    let (list, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;
-    Ok(HttpRes { list, total, page })
+    let (data, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;
+    Ok(HttpRes::<T>::new(data, total, page))
 }
 
 // fn get_pagination_res1<Table, T, U>(
@@ -250,9 +311,9 @@ where
 //     // T:  load_dsl::LoadQuery<PgConnection, T>
 // {
 //     let conn = pool.get().unwrap();
-//     let (list, total) = table
+//     let (data, total) = table
 //         .filter(search.unwrap())
 //         .paginate(page)
 //         .load_and_count_pages::<T>(&conn)?;
-//     Ok(HttpRes { list, total, page })
+//     Ok(HttpRes { data, total, page })
 // }

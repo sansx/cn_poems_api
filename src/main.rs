@@ -53,7 +53,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .data(pool.clone())
-            .route("/guwen", web::get().to(handlers::get_poems))
+            .route("/guwen/selectall", web::get().to(handlers::get_poems))
             .route("/guwen/selectbyid", web::get().to(handlers::get_poem_by_id))
             .route(
                 "/guwen/selectbywriter",
@@ -69,7 +69,7 @@ async fn main() -> std::io::Result<()> {
             )
             .route(
                 "/guwen/writer/selectall",
-                web::get().to(handlers::get_poems_by_search),
+                web::get().to(handlers::get_writers),
             )
             .route(
                 "/guwen/writer/selectbyname",
@@ -79,7 +79,14 @@ async fn main() -> std::io::Result<()> {
                 "/guwen/writer/selectbyid",
                 web::get().to(handlers::get_writer_by_search),
             )
-        // .route("/users", web::post().to(handlers::add_user))
+            .route(
+                "/guwen/sentence/selectall",
+                web::get().to(handlers::get_sentences),
+            )
+            .route(
+                "/guwen/selectbysententce",
+                web::get().to(handlers::get_poems_by_search),
+            )
     })
     .bind("127.0.0.1:8080")?
     .run()
