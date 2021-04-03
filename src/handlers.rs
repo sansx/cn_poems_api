@@ -3,32 +3,15 @@ use super::models::*;
 use super::pagination::*;
 use super::schema::*;
 use super::Pool;
-use actix_web::{web, Error, HttpResponse, Responder};
+use actix_web::{web, Error, HttpResponse};
+use diesel::prelude::*;
 use diesel::{
-    expression::AsExpression,
     pg::{Pg, PgConnection},
     query_builder::{AsQuery, QueryFragment},
-    Expression,
-};
-use diesel::{prelude::*, sql_types::Integer};
-use diesel::{
-    // dsl::{self, Find, Nullable},
-    query_dsl::{
-        // methods::{FilterDsl, FindDsl},
-        LoadQuery,
-        RunQueryDsl,
-    },
-    sql_types::{Bool, Text},
+    query_dsl::{LoadQuery, RunQueryDsl},
 };
 use serde::{Deserialize, Serialize};
 use std::{fmt::Debug, vec::Vec};
-
-// #[derive(Deserialize, Serialize)]
-// struct HttpRes<T> {
-//     data: Vec<T>,
-//     total: i64,
-//     page: i64,
-// }
 
 #[derive(Deserialize, Serialize)]
 struct HttpRes<T> {
@@ -160,15 +143,15 @@ pub async fn get_sentences(
     )
 }
 
-fn easy_get(pool: web::Data<Pool>, page: i64) -> Result<HttpRes<ResPoems>, diesel::result::Error> {
-    use self::poems::dsl::*;
-    let safepage = if page < 1 { 1 } else { page };
-    let conn = pool.get().unwrap();
-    let (data, total) = poems
-        .paginate(safepage)
-        .load_and_count_pages::<ResPoems>(&conn)?;
-    Ok(HttpRes::<ResPoems>::new(data, total, 1))
-}
+// fn easy_get(pool: web::Data<Pool>, page: i64) -> Result<HttpRes<ResPoems>, diesel::result::Error> {
+//     use self::poems::dsl::*;
+//     let safepage = if page < 1 { 1 } else { page };
+//     let conn = pool.get().unwrap();
+//     let (data, total) = poems
+//         .paginate(safepage)
+//         .load_and_count_pages::<ResPoems>(&conn)?;
+//     Ok(HttpRes::<ResPoems>::new(data, total, 1))
+// }
 
 pub async fn get_poem_by_id(
     db: web::Data<Pool>,
@@ -286,34 +269,3 @@ where
     let (data, total) = table.paginate(page).load_and_count_pages::<T>(&conn)?;
     Ok(HttpRes::<T>::new(data, total, page))
 }
-
-// fn get_pagination_res1<Table, T, U>(
-//     pool: web::Data<Pool>,
-//     table: Table,
-//     page: i64,
-//     search: Option<U>,
-// ) -> Result<HttpRes<T>, diesel::result::Error>
-// where
-//     Paginated<<Table as diesel::query_builder::AsQuery>::Query>:
-//         LoadQuery<PgConnection, (T, i64)> + RunQueryDsl<PgConnection> + QueryFragment<Pg>,
-//     Table: AsQuery + Sized + FilterDsl<U>, // + FindDsl<i64>
-//     U: diesel::expression::Expression + AsExpression<Text>,
-//     <Table as FilterDsl<U>>::Output: Paginate,
-//     Paginated<<<Table as FilterDsl<U>>::Output as diesel::query_builder::AsQuery>::Query>:
-//         LoadQuery<diesel::PgConnection, (T, i64)>,
-//     // diesel::query_builder::SelectStatement<Table>: FilterDsl<dyn diesel::expression::Expression<SqlType = Text>>,
-//     // diesel::query_builder::SelectStatement<Table>: FilterDsl<U>
-//     // Find<Table, i64>: LoadQuery<PgConnection, Paginated<Table>>,
-//     // <Table as FindDsl<i64>>::Output: crate::pagination::Paginate,
-//     // Paginated<<<Table as FindDsl<i64>>::Output as diesel::query_builder::AsQuery>::Query>:
-//     //     LoadQuery<PgConnection, (T, i64)> + RunQueryDsl<PgConnection> + QueryFragment<Pg>,
-//     //  load_dsl::LoadQuery<PgConnection, (T, i64)> + diesel::associations::HasTable + RunQueryDsl<PgConnection> ,
-//     // T:  load_dsl::LoadQuery<PgConnection, T>
-// {
-//     let conn = pool.get().unwrap();
-//     let (data, total) = table
-//         .filter(search.unwrap())
-//         .paginate(page)
-//         .load_and_count_pages::<T>(&conn)?;
-//     Ok(HttpRes { data, total, page })
-// }
